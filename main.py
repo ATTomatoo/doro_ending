@@ -1,8 +1,17 @@
-from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star, register
-from astrbot.api.message_components import Image
 import os
 import random
+from nonebot import on_command
+from nonebot.adapters.onebot.v11 import Bot, Event, MessageSegment, Message
+from nonebot.params import CommandArg
+from nonebot.plugin import PluginMetadata
+
+__plugin_meta__ = PluginMetadata(
+    name="Doro互动故事插件",
+    description="基于Nonebot2的Doro互动故事游戏",
+    usage="输入 /doro 开始游戏，然后通过 /选择 <选项> 进行选择",
+    type="application",
+    homepage="https://github.com/ttq7/doro_ending",
+)
 
 # 故事数据
 STORY_DATA = {
@@ -20,7 +29,6 @@ STORY_DATA = {
             ]}
         }
     },
-
     # 读书分支（5层深度）
     "study": {
         "text": "图书馆的霉味中，你发现：\nA.考研真题 B.发光菌菇 C.通风管异响\n（窗台放着半颗哦润吉）",
@@ -110,7 +118,6 @@ STORY_DATA = {
             ]}
         }
     },
-
     # 打工分支（6层深度）
     "work": {
         "text": "人才市场三个招聘点：\nA.福报大厂 B.摸鱼公司 C.神秘动物园\n（地上有KFC传单）",
@@ -186,7 +193,6 @@ STORY_DATA = {
             ]}
         }
     },
-
     # 社交分支（5层深度）
     "meet": {
         "text": "神秘人Doro出现：\nA.分享橘子 B.查看相册 C.阅读古书\n（ta口袋里露出纸巾）",
@@ -235,7 +241,6 @@ STORY_DATA = {
             ]}
         }
     },
-
     # 所有33个结局节点（保持原始ID和内容）
     "drain_end": {
         "text": "在潮湿阴暗的下水道，你与Doro分享着发霉的哦润吉，四周弥漫着神秘又诡异的气息...",
@@ -253,6 +258,31 @@ STORY_DATA = {
         "image": "procrastination_ending.png",
         "is_end": True
     },
+    "takeoff_failed_end":{
+        "text": "你决定把白纸撕掉，但你发现你无法从白纸中解开它...",
+        "image": "takeoff_failed_end.png",
+        "is_end": True
+    },
+    "mind_broken_end":{
+        "text": "你决定阅读禁书，但你发现你无法从禁书中解开它...",
+        "image": "mind_broken_end.png",
+        "is_end": True
+    },
+    "staffawakening_ending":{
+        "text": "你坐在办公室里，盯着Excel表格，感觉自己像一台没有感情的机器...",
+        "image": "staffawakening_ending.png",
+        "is_end": True
+    },
+    "laze_ending":{
+        "text": "你决定做懒人，但你发现你无法从懒人中解开它...",
+        "image": "laze_ending.png",
+        "is_end": True
+    },
+    "gaokao_ending":{
+        "text": "高考成绩公布后，你决定投奔你的梦想，但你发现你的计划并不太现实...",
+        "image": "gaokao_ending.png",
+        "is_end": True
+    },
     "race_ending": {
         "text": "在仓鼠轮中奋力奔跑，可永动机的梦想终究破灭，疲惫与无奈涌上心头...",
         "image": "neijuan_ending.jpg",
@@ -268,7 +298,6 @@ STORY_DATA = {
         "image": "staffawakening2_ending.png",
         "is_end": True
     },
-
     # 幻想系结局
     "butterfly_ending": {
         "text": "你变成了一只蝴蝶，翅膀上Doro的花纹闪烁着神秘光芒，在奇幻世界中自由飞舞...",
@@ -300,7 +329,6 @@ STORY_DATA = {
         "image": "sloth_ending.jpg",
         "is_end": True
     },
-
     # 元叙事结局
     "gingganggoolie_ending": {
         "text": "服用灵感菇后，小人儿在你眼前忙碌编排着你的命运，奇幻与荒诞交织...",
@@ -327,11 +355,10 @@ STORY_DATA = {
         "image": "abd814eba4fa165f44f3e16fb93b3a72.png",
         "is_end": True
     },
-
     # 特殊交互结局
     "dream_end": {
         "text": "小笨床仿佛拥有魔力，逐渐吞噬现实维度，带你进入奇妙梦境...",
-        "image": ["748ad50bef1249c2c16385c4b4c22ed5.jpg", "dream_ending.png"],
+        "image": ["dream_ending.png"],
         "is_end": True,
         "trigger": ["三次选择睡觉选项"]
     },
@@ -343,7 +370,7 @@ STORY_DATA = {
     },
     "good_end": {
         "text": "你和Doro携手找到了量子态的幸福，生活充满了彩虹般的色彩与希望...",
-        "image": "good_ending.png",
+        "image": "good_end.png",
         "is_end": True,
         "condition": ["解锁5个普通结局"]
     },
@@ -353,9 +380,14 @@ STORY_DATA = {
         "is_end": True,
         "secret_path": ["在所有分支找到隐藏橘子"]
     },
-     "marry_end": {
+    "marry_end": {
         "text": "❤️ 触发【登记结局】",
         "image": "marry_ending.png",
+        "is_end": True
+    },
+    "indolent_ending":{
+        "text": "你变成了一条鱼，生活在公司办公司的鱼缸里...",
+        "image": "indolent_ending.png",
         "is_end": True
     },
     # 新增连接节点
@@ -372,86 +404,100 @@ STORY_DATA = {
 # 存储每个用户的游戏状态，key为用户ID，value为当前故事节点
 user_game_state = {}
 
-# 图片目录路径，使用相对路径
+# 图片目录路径，相对于当前文件所在目录下的 images 文件夹
 IMAGE_DIR = os.path.join(os.path.dirname(__file__), "images")
 
+# 开始游戏命令
+doro_start = on_command("doro", aliases={"hello七七"}, priority=5, block=True)
 
-@register("doro_ending", "hello七七", "Doro互动故事插件", "1.0.0", "https://github.com/ttq7/doro_ending")
-class DoroStoryGamePlugin(Star):
-    def __init__(self, context: Context):
-        super().__init__(context)
+@doro_start.handle()
+async def handle_doro_start(bot: Bot, event: Event):
+    user_id = str(event.get_user_id())
+    user_game_state[user_id] = "start"
+    data = STORY_DATA["start"]
+    msg = data["text"] + "\n"
+    options = data.get("options", {})
+    for key, opt in options.items():
+        msg += f"{key}. {opt['text']}\n"
+    await doro_start.send(msg)
 
-    @filter.command("doro")
-    async def start_game(self, event: AstrMessageEvent):
-        sender_id = event.get_sender_id()
-        user_game_state[sender_id] = "start"
-        data = STORY_DATA["start"]
-        await event.send(event.plain_result(data["text"]))
-        options = data["options"]
-        options_text = ""
-        for key, opt in options.items():
-            options_text += f"{key}. {opt['text']}\n"
-        await event.send(event.plain_result(options_text))
+# 选择命令
+choose = on_command("选择", priority=5, block=True)
 
-    @filter.command("选择")
-    async def make_choice(self, event: AstrMessageEvent, choice: str):
-        sender_id = event.get_sender_id()
-        current_node = user_game_state.get(sender_id)
-        if not current_node:
-            await event.send(event.plain_result("游戏还未开始，请先输入 /doro 开始游戏。"))
-            return
+@choose.handle()
+async def handle_choose(bot: Bot, event: Event, args: Message = CommandArg()):
+    user_id = str(event.get_user_id())
+    if user_id not in user_game_state:
+        await choose.finish("你还没有开始游戏，请输入 /doro 开始。")
+        return
 
-        data = STORY_DATA.get(current_node)
-        if not data or "options" not in data:
-            await event.send(event.plain_result("游戏出现错误，请重新开始。"))
-            return
+    choice = args.extract_plain_text().strip().upper()  # 提取参数并转为大写
+    current_node = user_game_state[user_id]
+    data = STORY_DATA.get(current_node, {})
 
-        options = data["options"]
-        choice = choice.upper()
-        if choice not in options:
-            await event.send(event.plain_result("无效选择，请重新输入。"))
-            return
+    options = data.get("options", {})
+    if choice not in options:
+        await choose.finish("无效选择，请重新输入。")
+        return
 
-        next_info = options[choice]["next"]
-        if isinstance(next_info, list):
-            rand_num = random.random()
-            cumulative_prob = 0
-            for option in next_info:
-                cumulative_prob += option["probability"]
-                if rand_num < cumulative_prob:
-                    next_node = option["node"]
-                    break
-        else:
-            next_node = next_info
+    next_node = options[choice]["next"]
+    if isinstance(next_node, list):  # 随机选项
+        rand = random.random()
+        cumulative = 0.0
+        for item in next_node:
+            cumulative += item["probability"]
+            if rand <= cumulative:
+                next_node = item["node"]
+                break
 
-        user_game_state[sender_id] = next_node
-        next_data = STORY_DATA[next_node]
-        await event.send(event.plain_result(next_data["text"]))
+    next_data = STORY_DATA.get(next_node)
+    if not next_data:
+        await choose.finish("故事节点错误，请联系管理员。")
+        return
 
-        if "image" in next_data:
-            if isinstance(next_data["image"], list):
-                image_paths = [os.path.join(IMAGE_DIR, img) for img in next_data["image"]]
-                for image_path in image_paths:
-                    if os.path.exists(image_path):
-                        img = Image.fromFileSystem(image_path)
-                        await event.send(event.chain_result([img]))
-                    else:
-                        await event.send(event.plain_result(f"图片 {image_path} 不存在。"))
-            else:
-                image_path = os.path.join(IMAGE_DIR, next_data["image"])
+    user_game_state[user_id] = next_node
+
+    # 构造消息文本（包含故事描述和选项）
+    msg = next_data["text"] + "\n"
+    next_options = next_data.get("options", {})
+    for key, opt in next_options.items():
+        msg += f"{key}. {opt['text']}\n"
+
+    # 如果有对应图片，可以发送
+    default_image_path = os.path.join(IMAGE_DIR, f"{next_node}.jpg")
+    if os.path.exists(default_image_path):
+        await choose.send(MessageSegment.image(f"file://{default_image_path}"))
+
+    # 发送文本消息    
+    await choose.send(msg)
+
+    # 如果节点中指定了图片，则发送这些图片
+    if "image" in next_data:
+        if isinstance(next_data["image"], list):
+            for img_file in next_data["image"]:
+                image_path = os.path.join(IMAGE_DIR, img_file)
                 if os.path.exists(image_path):
-                    img = Image.fromFileSystem(image_path)
-                    await event.send(event.chain_result([img]))
+                    img_seg = MessageSegment.image(f"file://{image_path}")
+                    await choose.send(img_seg)
                 else:
-                    await event.send(event.plain_result(f"图片 {next_data['image']} 不存在。"))
-
-        if next_data.get("is_end", False):
-            await event.send(event.plain_result("故事结束。"))
-            user_game_state[sender_id] = None
+                    await choose.send(f"图片 {img_file} 不存在。")
         else:
-            options = next_data["options"]
+            image_path = os.path.join(IMAGE_DIR, next_data["image"])
+            if os.path.exists(image_path):
+                img_seg = MessageSegment.image(f"file://{image_path}")
+                await choose.send(img_seg)
+            else:
+                await choose.send(f"图片 {next_data['image']} 不存在。")
+
+    # 判断是否为结束节点
+    if next_data.get("is_end", False):
+        await choose.send("故事结束。")
+        # 删除用户状态，方便重新开始游戏
+        user_game_state.pop(user_id, None)
+    else:
+        # 展示选项列表（如果存在）
+        if "options" in next_data:
             options_text = ""
-            for key, opt in options.items():
+            for key, opt in next_data["options"].items():
                 options_text += f"{key}. {opt['text']}\n"
-            await event.send(event.plain_result(options_text))
-    
+            await choose.send(options_text)
